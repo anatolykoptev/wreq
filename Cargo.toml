@@ -102,10 +102,6 @@ lru = "0.18.0"
 btls = "0.5.6"
 btls-sys = "0.5.6"
 tokio-btls = "0.5.6"
-# Direct dep so `ForeignTypeRef::as_ptr` is nameable on btls's `SslRef`/`Ssl`
-# when calling BoringSSL FFI that btls does not wrap (e.g. trust_anchors).
-# Already a transitive dependency via btls; promoting it adds no new resolution.
-foreign-types = "0.5"
 tokio = { version = "1.52.3", default-features = false }
 compio = { version = "0.19.0-rc.1", features = ["io", "io-compat"], optional = true }
 wreq-rt = { version = "0.2.2-rc.2", default-features = false }
@@ -356,3 +352,25 @@ path = "examples/unix_socket.rs"
 name = "rt"
 path = "examples/rt.rs"
 required-features = ["compio-rt"]
+
+# Temporary: btls 0.5.6 on crates.io does not yet expose
+# `SslRef::set_requested_trust_anchors` / `SslContextBuilder::set_requested_trust_anchors`.
+# These patches point `btls` and `btls-sys` at our fork until upstream PR
+# 0x676e67/btls#168 ships a release containing those safe wrappers.
+#
+# The pin is tag-based (parent = the published `v0.5.6` tag), NOT based on
+# upstream btls main: main has diverged from the released 0.5.6 — `Hash` was
+# removed from `SslVersion` post-release, and wreq derives `Hash` for its
+# `TlsVersion` over that type, so a main-based pin breaks the build. The
+# wrapper is cherry-picked onto the tag as branch `feat/trust-anchors-binding-v056`.
+#
+# `btls-sys` must be patched too: the fork's `btls` depends on its workspace
+# `btls-sys` (path, `links = "boringssl"`), and wreq's direct `btls-sys = "0.5.6"`
+# from crates.io also `links = "boringssl"`. Cargo forbids two packages linking
+# the same native library, so patching only `btls` is a hard resolution failure.
+# Patching both collapses them to the fork's single `btls-sys` source.
+# Remove this stanza once the crates.io `btls` + `btls-sys` releases satisfy the
+# call site.
+[patch.crates-io]
+btls = { git = "https://github.com/anatolykoptev/btls", rev = "56c95cde8ffde73643007a2725e43b2d42ddca15" }
+btls-sys = { git = "https://github.com/anatolykoptev/btls", rev = "56c95cde8ffde73643007a2725e43b2d42ddca15" }

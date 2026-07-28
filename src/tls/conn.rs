@@ -20,7 +20,6 @@ use btls::{
     ssl::{Ssl, SslConnector, SslMethod, SslOptions, SslSessionCacheMode},
 };
 use ext::SslConnectorBuilderExt;
-use foreign_types::ForeignTypeRef;
 use http::{Uri, Version};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_btls::SslStream;
@@ -199,14 +198,7 @@ impl TlsConnector {
         // draft-ietf-tls-trust-anchor-ids). An empty list still sends the
         // extension; `None` (the default) sends nothing.
         if let Some(ref ids) = self.settings.requested_trust_anchors {
-            let ids = ids.as_ref();
-            #[allow(unsafe_code)]
-            let r = unsafe {
-                btls_sys::SSL_set1_requested_trust_anchors(cfg.as_ptr(), ids.as_ptr(), ids.len())
-            };
-            if r != 1 {
-                return Err(ErrorStack::get().into());
-            }
+            cfg.set_requested_trust_anchors(ids.as_ref())?;
         }
 
         let uri = descriptor.uri().clone();
